@@ -1,110 +1,182 @@
+# Specify the Terraform provider
 provider "aws" {
-  region = "us-east-1"
+  region = "us-east-2"
 }
 
-# Create a VPC
+# VPC Configuration
 resource "aws_vpc" "main" {
-  cidr_block = "10.0.0.0/16"
+  cidr_block           = "10.0.0.0/20"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
   tags = {
-    Name = "RDS-VPC"
+    Name = "assignment4-vpc"
   }
 }
 
-# Create Subnets in Two Different AZs
-resource "aws_subnet" "subnet_1" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.1.0/24"
-  availability_zone = "us-east-1a"
+# Public Subnets
+resource "aws_subnet" "public_subnets" {
+  count                   = 1
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = element(["10.0.0.0/22", "10.0.4.0/22"], count.index)
+  availability_zone       = element(["us-east-2a", "us-east-2b"], count.index)
+  map_public_ip_on_launch = true
+
   tags = {
-    Name = "RDS-Subnet-1"
+    Name = "public-subnet-${count.index}"
   }
 }
 
-resource "aws_subnet" "subnet_2" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.2.0/24"
-  availability_zone = "us-east-1b"
+# Public Subnets
+resource "aws_subnet" "public_subnets2" {
+  count                   = 2
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = element(["10.0.8.0/22", "10.0.12.0/22"], count.index)
+  availability_zone       = element(["us-east-2a", "us-east-2b"], count.index)
+  map_public_ip_on_launch = true
+
   tags = {
-    Name = "RDS-Subnet-2"
+    Name = "public-subnet-${count.index}"
   }
 }
 
-# Create a DB Subnet Group
-resource "aws_db_subnet_group" "db_subnet_group" {
-  name       = "example-db-subnet-group"
-  subnet_ids = [aws_subnet.subnet_1.id, aws_subnet.subnet_2.id]
-  tags = {
-    Name = "example-db-subnet-group"
-  }
-}
 
-# Create an RDS Instance
-resource "aws_db_instance" "postgresql" {
-  allocated_storage      = 20
-  engine                 = "postgres"
-  engine_version         = "13.15"
-  instance_class         = "db.t3.micro"
-  db_name                = "mydatabase"
-  username               = "dbadmin"
-  password               = "password123"
-  parameter_group_name   = "default.postgres13"
-  skip_final_snapshot    = true
-  db_subnet_group_name   = aws_db_subnet_group.db_subnet_group.name
-  vpc_security_group_ids = [aws_security_group.rds_sg.id]
-}
 
-# Security Group for RDS
-resource "aws_security_group" "rds_sg" {
+# Internet Gateway
+resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
+
   tags = {
-    Name = "RDS-SG"
+    Name = "assignment4-igw"
   }
 }
 
-# Allow inbound traffic to RDS (PostgreSQL)
-resource "aws_security_group_rule" "allow_postgres" {
-  type        = "ingress"
-  from_port   = 5432
-  to_port     = 5432
-  protocol    = "tcp"
-  cidr_blocks = ["0.0.0.0/0"] # Change this to a specific CIDR block for better security
-  security_group_id = aws_security_group.rds_sg.id
-}
 
-# VPC Peering Connection
-resource "aws_vpc_peering_connection" "peer" {
-  vpc_id      = aws_vpc.main.id # RDS VPC
-  peer_vpc_id = "vpc-068c32f71d07ad405" # Replace with the Default VPC ID
-  tags = {
-    Name = "RDS-Default-VPC-Peering"
-  }
-}
-
-# Route Table for RDS VPC
-resource "aws_route_table" "rds_vpc_route_table" {
+# Public Route Table
+resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+
   tags = {
-    Name = "RDS-VPC-Route-Table"
+    Name = "assignment4-public-route-table"
   }
 }
 
-# Route for VPC Peering in RDS Route Table
-resource "aws_route" "rds_vpc_peer_route" {
-  route_table_id         = aws_route_table.rds_vpc_route_table.id
+# Public Route Table Association
+resource "aws_route_table_association" "public" {
+  count          = 1
+  subnet_id      = aws_subnet.public_subnets[count.index].id
+  route_table_id = aws_route_table.public.id
+}
+
+
+# Security Group for master
+resource "aws_security_group" "master" {
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "master"
+  }
+}
+
+# master Host
+resource "aws_instance" "master" {
+  ami           = "ami-036841078a4b68e14"
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.public_subnets[0].id
+  vpc_security_group_ids = [aws_security_group.master.id]
+  key_name      = "ohio2"
+
+  tags = {
+    Name = "master-host"
+  }
+}
+
+# master2 Host
+resource "aws_instance" "master2" {
+  ami           = "ami-036841078a4b68e14"
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.public_subnets2[0].id
+  vpc_security_group_ids = [aws_security_group.master.id]
+  key_name      = "ohio2"
+
+  tags = {
+    Name = "master2-host"
+  }
+}
+
+# VPC Peering
+resource "aws_vpc_peering_connection" "vpc_peering" {
+  vpc_id      = aws_vpc.main.id
+  peer_vpc_id = "vpc-048c60e69d4e85c1b" # Replace with your Default VPC ID
+
+  tags = {
+    Name = "assignment4-vpc-peering"
+  }
+}
+
+resource "aws_vpc_peering_connection_accepter" "vpc_peering_accepter" {
+  vpc_peering_connection_id = aws_vpc_peering_connection.vpc_peering.id
+  auto_accept               = true
+
+  tags = {
+    Name = "assignment4-vpc-peering-accepter"
+  }
+}
+
+# Route from Custom VPC to Default VPC
+resource "aws_route" "custom_to_default" {
+  route_table_id         = aws_route_table.public.id # Replace with appropriate route table
   destination_cidr_block = "172.31.0.0/16" # Replace with Default VPC CIDR block
-  vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
+  vpc_peering_connection_id = aws_vpc_peering_connection.vpc_peering.id
 }
 
-# Associate RDS Subnets with Route Table
-resource "aws_route_table_association" "subnet_1_assoc" {
-  subnet_id      = aws_subnet.subnet_1.id
-  route_table_id = aws_route_table.rds_vpc_route_table.id
+# Route from Default VPC to Custom VPC
+resource "aws_route" "default_to_custom" {
+  route_table_id         = "rtb-04dbbcf2fcbc92b3f" # Replace with Default VPC Route Table ID
+  destination_cidr_block = aws_vpc.main.cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.vpc_peering.id
 }
 
-resource "aws_route_table_association" "subnet_2_assoc" {
-  subnet_id      = aws_subnet.subnet_2.id
-  route_table_id = aws_route_table.rds_vpc_route_table.id
+output "vpc_peering_connection_id" {
+  value = aws_vpc_peering_connection.vpc_peering.id
 }
-
-
-
