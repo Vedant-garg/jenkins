@@ -32,19 +32,3 @@
       ansible.builtin.apt:
         name: postgresql-client
         state: present
-
-    - name: Verify connection to RDS instance
-      ansible.builtin.shell: |
-        PGPASSWORD={{ rds_password }} psql -h {{ rds_endpoint }} -p {{ rds_port }} -U {{ rds_username }} -d {{ rds_db_name }} -c "\l"
-      register: psql_output
-      changed_when: false
-      failed_when: psql_output.rc != 0
-
-    - name: Display connection test result
-      ansible.builtin.debug:
-        var: psql_output.stdout
-
-    - name: Display connection error (if any)
-      ansible.builtin.debug:
-        var: psql_output.stderr
-      when: psql_output.rc != 0
