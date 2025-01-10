@@ -15,7 +15,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/oneaboveallms/oneclick.ms.git'
+                git branch: 'main', url: 'https://github.com/Vedant-garg/jenkins.git'
             }
         }
         stage('Terraform init') {
