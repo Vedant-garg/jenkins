@@ -16,7 +16,7 @@ resource "aws_vpc" "main" {
 
 # Public Subnets
 resource "aws_subnet" "public_subnets" {
-  count                   = 1
+  count                   = 2
   vpc_id                  = aws_vpc.main.id
   cidr_block              = element(["10.0.0.0/22", "10.0.4.0/22"], count.index)
   availability_zone       = element(["us-east-2a", "us-east-2b"], count.index)
@@ -26,20 +26,6 @@ resource "aws_subnet" "public_subnets" {
     Name = "public-subnet-${count.index}"
   }
 }
-
-# Public Subnets
-resource "aws_subnet" "public_subnets2" {
-  count                   = 2
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = element(["10.0.8.0/22", "10.0.12.0/22"], count.index)
-  availability_zone       = element(["us-east-2a", "us-east-2b"], count.index)
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name = "public-subnet-${count.index}"
-  }
-}
-
 
 
 # Internet Gateway
