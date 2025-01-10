@@ -137,17 +137,17 @@ resource "aws_instance" "master" {
 }
 
 # master2 Host
-resource "aws_instance" "master2" {
-  ami           = "ami-036841078a4b68e14"
-  instance_type = "t2.micro"
-  subnet_id     = aws_subnet.public_subnets2[0].id
-  vpc_security_group_ids = [aws_security_group.master.id]
-  key_name      = "ohio2"
+#resource "aws_instance" "master2" {
+  #ami           = "ami-036841078a4b68e14"
+  #instance_type = "t2.micro"
+  #subnet_id     = aws_subnet.public_subnets2[0].id
+  #vpc_security_group_ids = [aws_security_group.master.id]
+  #key_name      = "ohio2"
 
-  tags = {
-    Name = "master2-host"
-  }
-}
+  #tags = {
+    #Name = "master2-host"
+  #}
+#}
 
 # VPC Peering
 resource "aws_vpc_peering_connection" "vpc_peering" {
