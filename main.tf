@@ -140,7 +140,7 @@ resource "aws_instance" "master" {
 resource "aws_instance" "master2" {
   ami           = "ami-036841078a4b68e14"
   instance_type = "t2.micro"
-  subnet_id     = aws_subnet.public_subnets2[0].id
+  subnet_id     = aws_subnet.public_subnets[0].id
   vpc_security_group_ids = [aws_security_group.master.id]
   key_name      = "ohio2"
 
