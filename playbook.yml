@@ -1,0 +1,50 @@
+---
+- name: Configure PostgreSQL Client and Connect to RDS
+  hosts: all
+  become: yes
+  vars:
+    rds_endpoint: "terraform-20250109180444826000000001.c7ei2y6m4mf6.us-east-1.rds.amazonaws.com"   # Replace with the actual RDS endpoint
+    rds_port: 5432
+    rds_db_name: "mydatabase"
+    rds_username: "dbadmin"
+    rds_password: "password123"  # Will Use environment variable or Ansible Vault
+
+  tasks:
+    - name: Clean APT cache
+      ansible.builtin.shell: apt-get clean
+
+    - name: Import PostgreSQL signing key
+      ansible.builtin.apt_key:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        state: present
+
+    - name: Add PostgreSQL APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+        state: present
+        filename: "pgdg"
+
+    - name: Refresh APT cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install PostgreSQL client
+      ansible.builtin.apt:
+        name: postgresql-client
+        state: present
+
+    - name: Verify connection to RDS instance
+      ansible.builtin.shell: |
+        PGPASSWORD={{ rds_password }} psql -h {{ rds_endpoint }} -p {{ rds_port }} -U {{ rds_username }} -d {{ rds_db_name }} -c "\l"
+      register: psql_output
+      changed_when: false
+      failed_when: psql_output.rc != 0
+
+    - name: Display connection test result
+      ansible.builtin.debug:
+        var: psql_output.stdout
+
+    - name: Display connection error (if any)
+      ansible.builtin.debug:
+        var: psql_output.stderr
+      when: psql_output.rc != 0
