@@ -16,10 +16,10 @@ resource "aws_vpc" "main" {
 
 # Public Subnets
 resource "aws_subnet" "public_subnets" {
-  count                   = 1
+  count                   = 2
   vpc_id                  = aws_vpc.main.id
   cidr_block              = element(["10.0.0.0/22", "10.0.4.0/22"], count.index)
-  availability_zone       = element(["us-east-2a"], count.index)
+  availability_zone       = element(["us-east-2a", "us-east-2b"], count.index)
   map_public_ip_on_launch = true
 
   tags = {
@@ -27,18 +27,6 @@ resource "aws_subnet" "public_subnets" {
   }
 }
 
-# Public Subnets
-resource "aws_subnet" "public_subnets2" {
-  count                   = 1
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = element(["10.0.8.0/22", "10.0.12.0/22"], count.index)
-  availability_zone       = element(["us-east-2b"], count.index)
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name = "public-subnet-${count.index}"
-  }
-}
 
 
 # Internet Gateway
@@ -67,9 +55,8 @@ resource "aws_route_table" "public" {
 
 # Public Route Table Association
 resource "aws_route_table_association" "public" {
-  count          = 1
+  count          = 2
   subnet_id      = aws_subnet.public_subnets[count.index].id
-  subnet_id      = aws_subnet.public_subnets2[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
@@ -141,7 +128,7 @@ resource "aws_instance" "master" {
 resource "aws_instance" "master2" {
   ami           = "ami-036841078a4b68e14"
   instance_type = "t2.micro"
-  subnet_id     = aws_subnet.public_subnets2[0].id
+  subnet_id     = aws_subnet.public_subnets[0].id
   vpc_security_group_ids = [aws_security_group.master.id]
   key_name      = "ohio2"
 
